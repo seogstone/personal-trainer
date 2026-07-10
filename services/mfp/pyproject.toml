@@ -5,11 +5,13 @@ requires-python = ">=3.12"
 dependencies = [
   "pydantic>=2.8",
   "typer>=0.12",
-  "myfitnesspal>=2.1"
+  "myfitnesspal>=2.1",
+  "renpho-api>=0.1.0"
 ]
 
 [project.scripts]
 fitness-mfp = "fitness_mfp.cli:app"
+fitness-renpho = "fitness_mfp.renpho_cli:app"
 
 [tool.ruff]
 line-length = 100

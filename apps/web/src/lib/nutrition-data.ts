@@ -36,8 +36,8 @@ export async function getNutritionOverview(): Promise<NutritionOverview> {
       .maybeSingle(),
     supabase
       .from("body_metrics")
-      .select("weight_kg")
-      .eq("source", "myfitnesspal")
+      .select("weight_kg,source")
+      .in("source", ["renpho", "myfitnesspal"])
       .not("weight_kg", "is", null)
       .order("measured_at", { ascending: false })
       .limit(1)

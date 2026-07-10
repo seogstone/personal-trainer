@@ -3,6 +3,7 @@ import { loadLocalEnv } from "./env";
 import { createProviders } from "./providers";
 import { syncHevy } from "./sync/hevy";
 import { syncMyFitnessPal } from "./sync/mfp";
+import { syncRenpho } from "./sync/renpho";
 
 loadLocalEnv();
 
@@ -33,6 +34,17 @@ async function main() {
     };
     const summary = await syncMyFitnessPal(appEnv, syncInput);
     console.log(JSON.stringify({ level: "info", event: "mfp_sync_complete", summary }));
+    return;
+  }
+
+  if (command === "renpho:sync") {
+    const args = process.argv.slice(2).filter((arg) => arg !== "--" && arg !== command);
+    const syncInput = {
+      ...(args[0] ? { startDate: args[0] } : {}),
+      ...(args[1] ? { endDate: args[1] } : {})
+    };
+    const summary = await syncRenpho(appEnv, syncInput);
+    console.log(JSON.stringify({ level: "info", event: "renpho_sync_complete", summary }));
     return;
   }
 

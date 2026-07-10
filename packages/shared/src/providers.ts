@@ -1,4 +1,4 @@
-export type ProviderId = "whoop" | "hevy" | "myfitnesspal" | "csv";
+export type ProviderId = "whoop" | "hevy" | "myfitnesspal" | "csv" | "renpho";
 
 export type ConnectionStatus =
   | "connected"
@@ -97,7 +97,7 @@ export type NormalizedNutritionDay = {
 
 export type NormalizedBodyMetric = {
   userId: string;
-  source: "myfitnesspal" | "csv";
+  source: "myfitnesspal" | "csv" | "renpho";
   measuredAt: string;
   weightKg: number | null;
   bodyFatPercent: number | null;

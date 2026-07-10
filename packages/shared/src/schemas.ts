@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const providerIdSchema = z.enum(["whoop", "hevy", "myfitnesspal", "csv"]);
+export const providerIdSchema = z.enum(["whoop", "hevy", "myfitnesspal", "csv", "renpho"]);
 
 export const syncRangeSchema = z.object({
   userId: z.string().uuid(),
@@ -19,7 +19,9 @@ export const envSchema = z.object({
   HEVY_API_KEY: z.string().optional(),
   WHOOP_TOTEM_CREDENTIALS_PATH: z.string().optional(),
   MFP_COOKIE_FILE: z.string().optional(),
-  SECRETS_ENCRYPTION_KEY: z.string().optional()
+  SECRETS_ENCRYPTION_KEY: z.string().optional(),
+  RENPHO_EMAIL: z.string().email().optional(),
+  RENPHO_PASSWORD: z.string().optional()
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
