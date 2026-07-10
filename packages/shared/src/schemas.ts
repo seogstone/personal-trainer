@@ -12,6 +12,7 @@ export const envSchema = z.object({
   APP_BASE_URL: z.string().url().default("http://localhost:3000"),
   ALLOWED_EMAILS: z.string().min(1),
   INTERNAL_WORKER_SECRET: z.string().min(12),
+  APP_USER_ID: z.string().uuid().optional(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),

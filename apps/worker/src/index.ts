@@ -1,6 +1,7 @@
 import { envSchema } from "@fitness/shared";
 import { loadLocalEnv } from "./env";
 import { createProviders } from "./providers";
+import { syncHevy } from "./sync/hevy";
 
 loadLocalEnv();
 
@@ -11,9 +12,18 @@ if (!env.success) {
   process.exit(1);
 }
 
-const providers = createProviders(env.data);
+const appEnv = env.data;
+const providers = createProviders(appEnv);
 
 async function main() {
+  const command = process.argv.slice(2).find((arg) => arg !== "--");
+
+  if (command === "hevy:sync") {
+    const summary = await syncHevy(appEnv);
+    console.log(JSON.stringify({ level: "info", event: "hevy_sync_complete", summary }));
+    return;
+  }
+
   const statuses = await Promise.all([
     providers.recovery.getConnectionStatus(),
     providers.training.getConnectionStatus(),
