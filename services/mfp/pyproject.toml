@@ -3,6 +3,7 @@ name = "fitness-mfp-collector"
 version = "0.0.0"
 requires-python = ">=3.12"
 dependencies = [
+  "fastapi>=0.116",
   "pydantic>=2.8",
   "typer>=0.12",
   "myfitnesspal>=2.1",
