@@ -1,0 +1,18 @@
+[project]
+name = "fitness-mfp-collector"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.8",
+  "typer>=0.12",
+  "myfitnesspal>=2.1"
+]
+
+[project.scripts]
+fitness-mfp = "fitness_mfp.cli:app"
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

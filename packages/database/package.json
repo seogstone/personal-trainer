@@ -1,0 +1,12 @@
+{
+  "name": "@fitness/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "echo database package contains SQL migrations",
+    "lint": "echo database lint pending",
+    "test": "echo database has no tests yet",
+    "typecheck": "echo database has no TypeScript"
+  }
+}
