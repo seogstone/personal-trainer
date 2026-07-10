@@ -40,6 +40,9 @@ export async function syncRenpho(env: AppEnv, input?: { startDate?: string; endD
   }
 
   const args = ["--email", env.RENPHO_EMAIL, "--password", env.RENPHO_PASSWORD];
+  if (env.RENPHO_AREA_CODE) {
+    args.push("--area-code", env.RENPHO_AREA_CODE);
+  }
   if (input?.startDate) {
     args.push("--start-date", input.startDate);
   }

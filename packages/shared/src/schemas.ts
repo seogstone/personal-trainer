@@ -21,7 +21,8 @@ export const envSchema = z.object({
   MFP_COOKIE_FILE: z.string().optional(),
   SECRETS_ENCRYPTION_KEY: z.string().optional(),
   RENPHO_EMAIL: z.string().email().optional(),
-  RENPHO_PASSWORD: z.string().optional()
+  RENPHO_PASSWORD: z.string().optional(),
+  RENPHO_AREA_CODE: z.string().optional()
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
