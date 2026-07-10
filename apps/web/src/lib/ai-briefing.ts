@@ -1,6 +1,7 @@
 import type { NutritionOverview } from "./nutrition-data";
 import type { RecoveryOverview } from "./recovery-data";
 import type { TrainingOverview } from "./training-data";
+import { loadCoachAgentPrompt } from "./coach-agent-loader";
 
 export type AiBriefing = {
   status: "ready" | "not_configured" | "unavailable";
@@ -28,6 +29,7 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
   }
 
   try {
+    const agentPrompt = loadCoachAgentPrompt(["training", "nutrition", "recovery"]);
     const response = await fetch(OPENAI_RESPONSES_URL, {
       method: "POST",
       headers: {
@@ -39,15 +41,14 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
         input: [
           {
             role: "system",
-            content:
-              "You summarise a private fitness dashboard. Be concise, cautious, and evidence-based. Do not diagnose, do not claim causation, and do not invent data. Flag only practical items that deserve attention today."
+            content: `${agentPrompt}\n\nTask: Create a concise daily dashboard briefing. Be cautious and evidence-based. Use ASCII plain English only. Do not diagnose, do not claim causation, and do not invent data. Flag only practical items that deserve attention today.`
           },
           {
             role: "user",
             content: JSON.stringify(buildBriefingFacts(input))
           }
         ],
-        max_output_tokens: 700,
+        max_output_tokens: 900,
         store: false,
         text: {
           format: {
@@ -60,7 +61,7 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
               required: ["headline", "summary", "attentionItems"],
               properties: {
                 headline: { type: "string", maxLength: 90 },
-                summary: { type: "string", maxLength: 420 },
+                summary: { type: "string", maxLength: 520 },
                 attentionItems: {
                   type: "array",
                   maxItems: 4,
@@ -70,7 +71,7 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
                     required: ["label", "detail", "severity"],
                     properties: {
                       label: { type: "string", maxLength: 48 },
-                      detail: { type: "string", maxLength: 180 },
+                      detail: { type: "string", maxLength: 240 },
                       severity: { type: "string", enum: ["low", "medium", "high"] }
                     }
                   }
@@ -96,13 +97,27 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
     const parsed = JSON.parse(outputText);
     return {
       status: "ready",
-      headline: typeof parsed?.headline === "string" ? parsed.headline : "Daily briefing ready",
-      summary: typeof parsed?.summary === "string" ? parsed.summary : "Review the metrics below before training decisions.",
-      attentionItems: Array.isArray(parsed?.attentionItems) ? parsed.attentionItems.slice(0, 4) : []
+      headline: typeof parsed?.headline === "string" ? cleanText(parsed.headline) : "Daily briefing ready",
+      summary: typeof parsed?.summary === "string" ? cleanText(parsed.summary) : "Review the metrics below before training decisions.",
+      attentionItems: Array.isArray(parsed?.attentionItems)
+        ? parsed.attentionItems.slice(0, 4).map((item: { label?: unknown; detail?: unknown; severity?: unknown }) => ({
+            label: cleanText(typeof item.label === "string" ? item.label : "Attention"),
+            detail: cleanText(typeof item.detail === "string" ? item.detail : "Review this metric before making changes."),
+            severity: item.severity === "high" || item.severity === "medium" || item.severity === "low" ? item.severity : "low"
+          }))
+        : []
     };
   } catch {
     return fallbackBriefing("unavailable", "AI briefing is temporarily unavailable.");
   }
+}
+
+function cleanText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 type OpenAiResponsePayload = {
