@@ -1,34 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
+  "experimentalServices": {
     "web": {
-      "root": "apps/web",
-      "framework": "nextjs"
+      "entrypoint": "apps/web",
+      "framework": "nextjs",
+      "routePrefix": "/"
     },
     "mfp": {
-      "root": "services/mfp",
+      "entrypoint": "services/mfp/fitness_mfp/api.py",
       "framework": "fastapi",
-      "entrypoint": "fitness_mfp.api:app"
+      "routePrefix": "/api/mfp"
     }
-  },
-  "rewrites": [
-    {
-      "source": "/api/mfp/(.*)",
-      "destination": {
-        "service": "mfp"
-      }
-    },
-    {
-      "source": "/api/mfp",
-      "destination": {
-        "service": "mfp"
-      }
-    },
-    {
-      "source": "/(.*)",
-      "destination": {
-        "service": "web"
-      }
-    }
-  ]
+  }
 }
