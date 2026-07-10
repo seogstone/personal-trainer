@@ -113,11 +113,18 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
 }
 
 function cleanText(value: string) {
-  return value
+  const cleaned = value
     .normalize("NFKD")
     .replace(/[^\x20-\x7E]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  if (!cleaned || /[.!?]$/.test(cleaned)) {
+    return cleaned;
+  }
+
+  const lastSentenceEnd = Math.max(cleaned.lastIndexOf("."), cleaned.lastIndexOf("!"), cleaned.lastIndexOf("?"));
+  return lastSentenceEnd > 40 ? cleaned.slice(0, lastSentenceEnd + 1) : cleaned;
 }
 
 type OpenAiResponsePayload = {

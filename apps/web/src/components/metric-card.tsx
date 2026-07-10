@@ -1,15 +1,15 @@
 import type { LucideIcon } from "lucide-react";
 
 const tones = {
-  green: "text-emerald-700 bg-emerald-50 border-emerald-200",
-  blue: "text-blue-700 bg-blue-50 border-blue-200",
-  amber: "text-amber-800 bg-amber-50 border-amber-200",
-  red: "text-rose-700 bg-rose-50 border-rose-200"
+  green: "text-[#43d6c9] bg-[#123b39] border-[#2a7771]",
+  blue: "text-[#7cc7ff] bg-[#172f43] border-[#315d7b]",
+  amber: "text-[#f0ad4e] bg-[#3d2b12] border-[#7b5620]",
+  red: "text-[#ff8a64] bg-[#3e2018] border-[#84412e]"
 };
 
 export function MetricCard({ icon: Icon, label, value, helper, tone }: { icon: LucideIcon; label: string; value: string; helper: string; tone: keyof typeof tones }) {
   return (
-    <article className="rounded-md border border-border bg-panel p-4">
+    <article className="rounded-md border border-border bg-panel/90 p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-muted">{label}</p>
         <span className={`rounded-md border p-2 ${tones[tone]}`}>

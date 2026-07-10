@@ -5,6 +5,7 @@ export type NutritionOverview = {
   days: NormalizedNutritionDay[];
   mealCount: number;
   latestWeightKg: number | null;
+  latestBodyFatPercent: number | null;
   connection: {
     status: string;
     lastSuccessfulSyncAt: string | null;
@@ -36,7 +37,7 @@ export async function getNutritionOverview(): Promise<NutritionOverview> {
       .maybeSingle(),
     supabase
       .from("body_metrics")
-      .select("weight_kg,source")
+      .select("weight_kg,body_fat_percent,source")
       .in("source", ["renpho", "myfitnesspal"])
       .not("weight_kg", "is", null)
       .order("measured_at", { ascending: false })
@@ -67,6 +68,7 @@ export async function getNutritionOverview(): Promise<NutritionOverview> {
         return sum + (Array.isArray(day.nutrition_meals) ? day.nutrition_meals.length : 0);
       }, 0) ?? 0,
     latestWeightKg: weightResult.error ? null : ((weightResult.data?.weight_kg as number | null | undefined) ?? null),
+    latestBodyFatPercent: weightResult.error ? null : ((weightResult.data?.body_fat_percent as number | null | undefined) ?? null),
     connection: connectionResult.data
       ? {
           status: connectionResult.data.status as string,
@@ -82,6 +84,7 @@ function emptyNutritionOverview(status = "not_configured"): NutritionOverview {
     days: [],
     mealCount: 0,
     latestWeightKg: null,
+    latestBodyFatPercent: null,
     connection: {
       status,
       lastSuccessfulSyncAt: null,
