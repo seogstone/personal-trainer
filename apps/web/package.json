@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "next build",
+    "build": "pnpm --filter @fitness/shared build && pnpm --filter @fitness/analytics build && next build",
     "dev": "next dev",
     "lint": "next lint",
     "test": "echo web has no tests yet",
