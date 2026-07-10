@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import type { AppEnv, NormalizedBodyMetric, NormalizedNutritionDay, NutritionProvider, ProviderConnection, SyncRange } from "@fitness/shared";
 
 export class MyFitnessPalProvider implements NutritionProvider {
@@ -16,7 +16,7 @@ export class MyFitnessPalProvider implements NutritionProvider {
 
   async getConnectionStatus(): Promise<ProviderConnection> {
     const cookieFile = this.env.MFP_COOKIE_FILE;
-    const configured = cookieFile ? existsSync(cookieFile) : false;
+    const configured = cookieFile ? hasUsableCookieFile(cookieFile) : false;
 
     return {
       provider: "myfitnesspal",
@@ -31,8 +31,16 @@ export class MyFitnessPalProvider implements NutritionProvider {
   }
 
   private assertConfigured() {
-    if (!this.env.MFP_COOKIE_FILE) {
+    if (!this.env.MFP_COOKIE_FILE || !hasUsableCookieFile(this.env.MFP_COOKIE_FILE)) {
       throw new Error("MFP_COOKIE_FILE is not configured");
     }
+  }
+}
+
+function hasUsableCookieFile(path: string) {
+  try {
+    return existsSync(path) && statSync(path).size > 0;
+  } catch {
+    return false;
   }
 }
