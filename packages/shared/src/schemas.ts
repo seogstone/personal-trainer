@@ -20,6 +20,7 @@ export const envSchema = z.object({
   WHOOP_TOTEM_CREDENTIALS_PATH: z.string().optional(),
   MFP_COOKIE_FILE: z.string().optional(),
   SECRETS_ENCRYPTION_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
   RENPHO_EMAIL: z.string().email().optional(),
   RENPHO_PASSWORD: z.string().optional(),
   RENPHO_AREA_CODE: z.string().optional()

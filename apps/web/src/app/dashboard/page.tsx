@@ -1,9 +1,10 @@
-import { Activity, Dumbbell, Moon, RefreshCcw, Utensils } from "lucide-react";
+import { Activity, Brain, Dumbbell, Moon, RefreshCcw, Utensils } from "lucide-react";
 import { calculateNutritionAdherence, calculateReadiness, recommendTraining } from "@fitness/analytics";
 import { demoConnections, demoNutrition, demoRecovery } from "@fitness/shared";
 import { MetricCard } from "@/components/metric-card";
 import { TrendChart } from "@/components/trend-chart";
 import { Shell } from "@/components/shell";
+import { getAiBriefing } from "@/lib/ai-briefing";
 import { getNutritionOverview } from "@/lib/nutrition-data";
 import { getRecoveryOverview } from "@/lib/recovery-data";
 import { getTrainingOverview } from "@/lib/training-data";
@@ -36,6 +37,7 @@ export default async function DashboardPage() {
     nextRoutineTitle: training.routines[0]?.title ?? "the next planned routine",
     sleptUnderSixHours: false
   });
+  const aiBriefing = await getAiBriefing({ training, nutrition: nutritionOverview, recovery: recoveryOverview });
   const connections = demoConnections.map((connection) => {
     if (connection.provider === "whoop" && recoveryOverview.connection) {
       return {
@@ -126,6 +128,33 @@ export default async function DashboardPage() {
               ))}
             </div>
           </div>
+        </section>
+
+        <section className="rounded-md border border-border bg-panel p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-medium text-muted">
+                <Brain className="h-4 w-4" />
+                AI briefing
+              </div>
+              <h2 className="mt-2 text-xl font-semibold">{aiBriefing.headline}</h2>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">{aiBriefing.summary}</p>
+            </div>
+            <span className="w-fit rounded-sm border border-border px-2 py-1 text-xs text-muted">{aiBriefing.status.replaceAll("_", " ")}</span>
+          </div>
+          {aiBriefing.attentionItems.length ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {aiBriefing.attentionItems.map((item) => (
+                <div className="rounded-md border border-border bg-background/40 p-3" key={`${item.label}:${item.detail}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium">{item.label}</p>
+                    <span className="rounded-sm border border-border px-2 py-1 text-xs capitalize text-muted">{item.severity}</span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <section className="grid gap-4 lg:grid-cols-2">
