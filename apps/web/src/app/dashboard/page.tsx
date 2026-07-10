@@ -4,15 +4,17 @@ import { demoConnections, demoNutrition, demoRecovery } from "@fitness/shared";
 import { MetricCard } from "@/components/metric-card";
 import { TrendChart } from "@/components/trend-chart";
 import { Shell } from "@/components/shell";
+import { getNutritionOverview } from "@/lib/nutrition-data";
 import { getTrainingOverview } from "@/lib/training-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const training = await getTrainingOverview();
+  const [training, nutritionOverview] = await Promise.all([getTrainingOverview(), getNutritionOverview()]);
   const todayRecovery = demoRecovery.at(-1);
-  const todayNutrition = demoNutrition.at(-1);
-  const nutrition = calculateNutritionAdherence(demoNutrition);
+  const nutritionDays = nutritionOverview.days.length ? nutritionOverview.days : demoNutrition;
+  const todayNutrition = nutritionDays.at(-1);
+  const nutrition = calculateNutritionAdherence(nutritionDays);
   const readiness = calculateReadiness({
     whoopRecoveryScore: todayRecovery?.recoveryScore ?? null,
     sleepMinutes: 438,
@@ -31,18 +33,31 @@ export default async function DashboardPage() {
     nextRoutineTitle: training.routines[0]?.title ?? "the next planned routine",
     sleptUnderSixHours: false
   });
-  const connections = demoConnections.map((connection) =>
-    connection.provider === "hevy" && training.connection
-      ? {
-          ...connection,
-          status: training.connection.status === "connected" ? ("connected" as const) : connection.status,
-          lastSuccessfulSyncAt: training.connection.lastSuccessfulSyncAt,
-          safeMessage: training.routines.length
-            ? `${training.routines.length} routines synced from Hevy.`
-            : "Hevy connected; no routines synced yet."
-        }
-      : connection
-  );
+  const connections = demoConnections.map((connection) => {
+    if (connection.provider === "hevy" && training.connection) {
+      return {
+        ...connection,
+        status: training.connection.status === "connected" ? ("connected" as const) : connection.status,
+        lastSuccessfulSyncAt: training.connection.lastSuccessfulSyncAt,
+        safeMessage: training.routines.length
+          ? `${training.routines.length} routines synced from Hevy.`
+          : "Hevy connected; no routines synced yet."
+      };
+    }
+
+    if (connection.provider === "myfitnesspal" && nutritionOverview.connection) {
+      return {
+        ...connection,
+        status: nutritionOverview.connection.status === "connected" ? ("connected" as const) : connection.status,
+        lastSuccessfulSyncAt: nutritionOverview.connection.lastSuccessfulSyncAt,
+        safeMessage: nutritionOverview.days.length
+          ? `${nutritionOverview.days.length} nutrition days synced from MyFitnessPal.`
+          : "MyFitnessPal connected; no diary days synced yet."
+      };
+    }
+
+    return connection;
+  });
 
   return (
     <Shell active="dashboard">
@@ -104,7 +119,7 @@ export default async function DashboardPage() {
           />
           <TrendChart
             title="Calories and protein"
-            data={demoNutrition.map((day) => ({ date: day.calendarDate.slice(5), calories: day.caloriesConsumed ?? 0, protein: day.proteinG ?? 0 }))}
+            data={nutritionDays.map((day) => ({ date: day.calendarDate.slice(5), calories: day.caloriesConsumed ?? 0, protein: day.proteinG ?? 0 }))}
             lines={[
               { dataKey: "calories", name: "Calories", color: "#ef4444" },
               { dataKey: "protein", name: "Protein", color: "#d97706" }
