@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import type { AppEnv, NormalizedBodyMetric, NormalizedNutritionDay, NutritionProvider, ProviderConnection, SyncRange } from "@fitness/shared";
 
 export class MyFitnessPalProvider implements NutritionProvider {
@@ -14,13 +15,18 @@ export class MyFitnessPalProvider implements NutritionProvider {
   }
 
   async getConnectionStatus(): Promise<ProviderConnection> {
+    const cookieFile = this.env.MFP_COOKIE_FILE;
+    const configured = cookieFile ? existsSync(cookieFile) : false;
+
     return {
       provider: "myfitnesspal",
-      status: this.env.MFP_COOKIE_FILE ? "connected" : "not_configured",
+      status: configured ? "connected" : "not_configured",
       lastSuccessfulSyncAt: null,
       lastAttemptedSyncAt: null,
-      reauthenticationRequired: false,
-      safeMessage: "Cookie-based collection runs through the persistent Python collector."
+      reauthenticationRequired: Boolean(cookieFile && !configured),
+      safeMessage: configured
+        ? "Cookie-based collection runs through the persistent Python collector."
+        : "Configure MFP_COOKIE_FILE with an exported MyFitnessPal browser cookie jar."
     };
   }
 
