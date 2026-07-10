@@ -5,20 +5,23 @@ import { MetricCard } from "@/components/metric-card";
 import { TrendChart } from "@/components/trend-chart";
 import { Shell } from "@/components/shell";
 import { getNutritionOverview } from "@/lib/nutrition-data";
+import { getRecoveryOverview } from "@/lib/recovery-data";
 import { getTrainingOverview } from "@/lib/training-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [training, nutritionOverview] = await Promise.all([getTrainingOverview(), getNutritionOverview()]);
-  const todayRecovery = demoRecovery.at(-1);
+  const [training, nutritionOverview, recoveryOverview] = await Promise.all([getTrainingOverview(), getNutritionOverview(), getRecoveryOverview()]);
+  const recoveryDays = recoveryOverview.recoveries.length ? recoveryOverview.recoveries : demoRecovery;
+  const todayRecovery = recoveryDays.at(-1);
+  const todaySleep = recoveryOverview.sleeps.at(-1);
   const nutritionDays = nutritionOverview.days.length ? nutritionOverview.days : demoNutrition;
   const todayNutrition = nutritionDays.at(-1);
   const nutrition = calculateNutritionAdherence(nutritionDays);
   const readiness = calculateReadiness({
     whoopRecoveryScore: todayRecovery?.recoveryScore ?? null,
-    sleepMinutes: 438,
-    sleepNeedMinutes: 480,
+    sleepMinutes: todaySleep?.totalSleepMinutes ?? null,
+    sleepNeedMinutes: todaySleep?.sleepNeedMinutes ?? null,
     hrvRmssdMs: todayRecovery?.hrvRmssdMs ?? null,
     hrvBaselineRmssdMs: 61,
     restingHeartRate: todayRecovery?.restingHeartRate ?? null,
@@ -34,6 +37,17 @@ export default async function DashboardPage() {
     sleptUnderSixHours: false
   });
   const connections = demoConnections.map((connection) => {
+    if (connection.provider === "whoop" && recoveryOverview.connection) {
+      return {
+        ...connection,
+        status: recoveryOverview.connection.status === "connected" ? ("connected" as const) : connection.status,
+        lastSuccessfulSyncAt: recoveryOverview.connection.lastSuccessfulSyncAt,
+        safeMessage: recoveryOverview.recoveries.length
+          ? `${recoveryOverview.recoveries.length} recovery days synced from WHOOP.`
+          : "WHOOP connected; no recovery days synced yet."
+      };
+    }
+
     if (connection.provider === "hevy" && training.connection) {
       return {
         ...connection,
@@ -75,7 +89,13 @@ export default async function DashboardPage() {
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard icon={Activity} label="Dashboard readiness" value={readinessScore ? `${readinessScore}` : "N/A"} helper="Deterministic score, not diagnosis" tone="green" />
-          <MetricCard icon={Moon} label="Sleep" value="7h 18m" helper="91% of estimated need" tone="blue" />
+          <MetricCard
+            icon={Moon}
+            label="Sleep"
+            value={todaySleep?.totalSleepMinutes ? formatMinutes(todaySleep.totalSleepMinutes) : "N/A"}
+            helper={todaySleep?.sleepPerformancePercent ? `${Math.round(todaySleep.sleepPerformancePercent)}% of estimated need` : "WHOOP sleep sync required"}
+            tone="blue"
+          />
           <MetricCard icon={Utensils} label="Protein" value={`${todayNutrition?.proteinG ?? 0}g`} helper={`${nutrition.proteinAdherencePercent ?? 0}% of target logged`} tone="amber" />
           <MetricCard icon={Dumbbell} label="Training" value={`${training.workoutsThisWeek}/3`} helper={`${training.routines.length} Hevy routines synced`} tone="red" />
         </section>
@@ -111,7 +131,7 @@ export default async function DashboardPage() {
         <section className="grid gap-4 lg:grid-cols-2">
           <TrendChart
             title="Recovery and HRV"
-            data={demoRecovery.map((day) => ({ date: day.calendarDate.slice(5), recovery: day.recoveryScore ?? 0, hrv: day.hrvRmssdMs ?? 0 }))}
+            data={recoveryDays.map((day) => ({ date: day.calendarDate.slice(5), recovery: day.recoveryScore ?? 0, hrv: day.hrvRmssdMs ?? 0 }))}
             lines={[
               { dataKey: "recovery", name: "Recovery", color: "#0f9f83" },
               { dataKey: "hrv", name: "HRV", color: "#3b82f6" }
@@ -129,4 +149,10 @@ export default async function DashboardPage() {
       </div>
     </Shell>
   );
+}
+
+function formatMinutes(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}h ${mins}m`;
 }
