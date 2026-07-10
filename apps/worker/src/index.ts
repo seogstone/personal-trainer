@@ -1,5 +1,8 @@
 import { envSchema } from "@fitness/shared";
+import { loadLocalEnv } from "./env";
 import { createProviders } from "./providers";
+
+loadLocalEnv();
 
 const env = envSchema.safeParse(process.env);
 
