@@ -4,7 +4,7 @@ import type { TrainingOverview } from "./training-data";
 import { loadCoachAgentPrompt } from "./coach-agent-loader";
 
 export type AiBriefing = {
-  status: "ready" | "not_configured" | "unavailable";
+  status: "ready" | "fallback" | "not_configured" | "unavailable";
   headline: string;
   summary: string;
   attentionItems: Array<{
@@ -21,12 +21,19 @@ type BriefingInput = {
 };
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const MODEL = "gpt-5.6-luna";
+const DEFAULT_MODEL = "gpt-5.6-luna";
+const REQUEST_TIMEOUT_MS = 12_000;
 
 export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
   if (!process.env.OPENAI_API_KEY) {
-    return fallbackBriefing("not_configured", "Add OPENAI_API_KEY to enable AI briefing.");
+    return {
+      ...buildRuleBasedBriefing(input, "OpenAI is not configured yet."),
+      status: "not_configured"
+    };
   }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const agentPrompt = loadCoachAgentPrompt(["training", "nutrition", "recovery"]);
@@ -37,7 +44,7 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
         authorization: `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: process.env.OPENAI_MODEL || DEFAULT_MODEL,
         input: [
           {
             role: "system",
@@ -81,17 +88,20 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
           }
         }
       }),
-      next: { revalidate: 900 }
+      next: { revalidate: 900 },
+      signal: controller.signal
     });
 
     if (!response.ok) {
-      return fallbackBriefing("unavailable", "AI briefing is temporarily unavailable.");
+      await logOpenAiError(response);
+      return buildRuleBasedBriefing(input, "OpenAI briefing failed, so this is a local summary.");
     }
 
     const payload = (await response.json()) as OpenAiResponsePayload;
     const outputText = extractOutputText(payload);
     if (!outputText) {
-      return fallbackBriefing("unavailable", "AI briefing returned no readable summary.");
+      console.warn("OpenAI briefing returned no output text.");
+      return buildRuleBasedBriefing(input, "OpenAI returned no readable summary, so this is a local summary.");
     }
 
     const parsed = JSON.parse(outputText);
@@ -107,8 +117,14 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
           }))
         : []
     };
-  } catch {
-    return fallbackBriefing("unavailable", "AI briefing is temporarily unavailable.");
+  } catch (error) {
+    console.warn("AI briefing fallback used.", {
+      name: error instanceof Error ? error.name : "UnknownError",
+      message: safeLogMessage(error instanceof Error ? error.message : "Unknown AI briefing error")
+    });
+    return buildRuleBasedBriefing(input, "OpenAI briefing is temporarily unavailable, so this is a local summary.");
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -146,6 +162,21 @@ function extractOutputText(payload: OpenAiResponsePayload) {
     ?.flatMap((item) => item.content ?? [])
     .find((part) => part.type === "output_text" && typeof part.text === "string")
     ?.text;
+}
+
+async function logOpenAiError(response: Response) {
+  let body = "";
+  try {
+    body = await response.text();
+  } catch {
+    body = "Unable to read OpenAI error body";
+  }
+
+  console.warn("OpenAI briefing request failed.", {
+    status: response.status,
+    statusText: response.statusText,
+    body: safeLogMessage(body)
+  });
 }
 
 function buildBriefingFacts({ training, nutrition, recovery }: BriefingInput) {
@@ -201,11 +232,67 @@ function buildBriefingFacts({ training, nutrition, recovery }: BriefingInput) {
   };
 }
 
-function fallbackBriefing(status: AiBriefing["status"], summary: string): AiBriefing {
+function buildRuleBasedBriefing(input: BriefingInput, reason: string): AiBriefing {
+  const facts = buildBriefingFacts(input);
+  const items: AiBriefing["attentionItems"] = [];
+
+  if (!facts.recovery || !facts.sleep) {
+    items.push({
+      label: "Recovery context",
+      detail: "Recovery or sleep data is missing for today. Use energy, symptoms, and warm-up quality before deciding how hard to train.",
+      severity: "medium"
+    });
+  } else if (typeof facts.recovery.recoveryScore === "number" && facts.recovery.recoveryScore < 45) {
+    items.push({
+      label: "Low recovery",
+      detail: "Recovery is low today. Keep the planned session controlled, reduce optional volume, and avoid chasing failure sets.",
+      severity: "high"
+    });
+  }
+
+  const sleepDebtMinutes =
+    facts.sleep?.totalSleepMinutes != null && facts.sleep.sleepNeedMinutes != null ? facts.sleep.sleepNeedMinutes - facts.sleep.totalSleepMinutes : null;
+  if (sleepDebtMinutes != null && sleepDebtMinutes > 60) {
+    items.push({
+      label: "Sleep gap",
+      detail: `Sleep is short by about ${formatHours(sleepDebtMinutes)}. Prioritise an earlier night and keep hard training decisions conservative.`,
+      severity: "medium"
+    });
+  }
+
+  if (facts.nutrition && "proteinG" in facts.nutrition && facts.nutrition.goalProteinG && facts.nutrition.proteinG != null) {
+    const proteinPercent = facts.nutrition.goalProteinG ? facts.nutrition.proteinG / facts.nutrition.goalProteinG : null;
+    if (proteinPercent != null && proteinPercent < 0.75) {
+      items.push({
+        label: "Protein target",
+        detail: `Logged protein is ${Math.round(facts.nutrition.proteinG)}g against a ${Math.round(facts.nutrition.goalProteinG)}g target. Add a high-protein meal if the log is complete.`,
+        severity: "medium"
+      });
+    }
+  }
+
+  if (facts.training.workoutsThisWeek === 0 && facts.training.routineCount > 0) {
+    items.push({
+      label: "Training habit",
+      detail: `${facts.training.nextRoutineTitle ?? "Your next routine"} is ready. Aim to get the first weekly session done before adding extras.`,
+      severity: "low"
+    });
+  }
+
   return {
-    status,
-    headline: status === "not_configured" ? "AI briefing not configured" : "AI briefing unavailable",
-    summary,
-    attentionItems: []
+    status: "fallback",
+    headline: "Local coaching summary ready",
+    summary: `${reason} Data loaded: ${facts.dataAvailability.recoveryDays} recovery days, ${facts.dataAvailability.sleepSessions} sleep sessions, ${facts.dataAvailability.nutritionDays} nutrition days, and ${facts.dataAvailability.hevyRoutines} routines. Treat missing same-day recovery or incomplete food logging as provisional before making training decisions.`,
+    attentionItems: items.slice(0, 4)
   };
+}
+
+function safeLogMessage(value: string) {
+  return value.replace(/[^\x20-\x7E]/g, "").slice(0, 500);
+}
+
+function formatHours(minutes: number) {
+  const hours = Math.floor(Math.abs(minutes) / 60);
+  const mins = Math.abs(minutes) % 60;
+  return hours ? `${hours}h ${mins}m` : `${mins}m`;
 }

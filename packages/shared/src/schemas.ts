@@ -26,6 +26,7 @@ export const envSchema = z.object({
   MFP_SERVICE_URL: z.string().url().optional(),
   SECRETS_ENCRYPTION_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().optional(),
   RENPHO_EMAIL: z.string().email().optional(),
   RENPHO_PASSWORD: z.string().optional(),
   RENPHO_AREA_CODE: z.string().optional()
