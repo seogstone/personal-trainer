@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @fitness/shared build && pnpm --filter @fitness/analytics build && next build",
+    "build": "pnpm --filter @fitness/shared build && pnpm --filter @fitness/analytics build && pnpm --filter @fitness/worker build && next build",
     "dev": "next dev",
     "lint": "next lint",
     "test": "echo web has no tests yet",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@fitness/analytics": "workspace:*",
     "@fitness/shared": "workspace:*",
+    "@fitness/worker": "workspace:*",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.5",
     "clsx": "^2.1.1",

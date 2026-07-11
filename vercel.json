@@ -30,5 +30,11 @@
         "service": "web"
       }
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/daily-sync",
+      "schedule": "30 6 * * *"
+    }
   ]
 }
