@@ -1,13 +1,10 @@
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import type { AppEnv } from "@fitness/shared";
 import { createSupabaseAdmin, resolveUserId, type SupabaseAdmin } from "./supabase";
-
-const require = createRequire(import.meta.url);
 
 const recoverySchema = z.object({
   date: z.string(),
@@ -116,8 +113,10 @@ function enumerateDates(startDate: string, endDate: string) {
 
 async function createTotemClient(credentialsPath: string) {
   loadEnvFile(credentialsPath);
-  const totemRoot = resolveTotemRuntimeRoot(credentialsPath);
-  const importFromTotem = async (path: string) => import(pathToFileURL(join(totemRoot, path)).href);
+  const localRoot = dirname(credentialsPath);
+  const hasLocalRuntime = existsSync(join(localRoot, "dist/whoop/client.js"));
+  const importFromTotem = async (path: TotemModulePath) =>
+    hasLocalRuntime ? import(pathToFileURL(join(localRoot, path)).href) : importTotemPackageModule(path);
   const [{ WhoopClient }, { TokenManager }, { EnvFileTokenStore }] = await Promise.all([
     importFromTotem("dist/whoop/client.js"),
     importFromTotem("dist/whoop/token_manager.js"),
@@ -135,10 +134,41 @@ async function createTotemClient(credentialsPath: string) {
   });
 
   return {
-    root: totemRoot,
+    root: localRoot,
     client: new WhoopClient({ getToken: () => tokenManager.getToken() }),
     importFromTotem
   };
+}
+
+type TotemModulePath =
+  | "dist/whoop/client.js"
+  | "dist/whoop/token_manager.js"
+  | "dist/whoop/token_store.js"
+  | "dist/projections/recovery.js"
+  | "dist/schemas/recovery.js"
+  | "dist/projections/sleep.js"
+  | "dist/schemas/sleep.js";
+
+async function importTotemPackageModule(path: TotemModulePath) {
+  if (path === "dist/whoop/client.js") {
+    return import("@thebriangao/totem/dist/whoop/client.js");
+  }
+  if (path === "dist/whoop/token_manager.js") {
+    return import("@thebriangao/totem/dist/whoop/token_manager.js");
+  }
+  if (path === "dist/whoop/token_store.js") {
+    return import("@thebriangao/totem/dist/whoop/token_store.js");
+  }
+  if (path === "dist/projections/recovery.js") {
+    return import("@thebriangao/totem/dist/projections/recovery.js");
+  }
+  if (path === "dist/schemas/recovery.js") {
+    return import("@thebriangao/totem/dist/schemas/recovery.js");
+  }
+  if (path === "dist/projections/sleep.js") {
+    return import("@thebriangao/totem/dist/projections/sleep.js");
+  }
+  return import("@thebriangao/totem/dist/schemas/sleep.js");
 }
 
 function resolveCredentialsPath(env: AppEnv) {
@@ -156,14 +186,6 @@ function resolveCredentialsPath(env: AppEnv) {
   return env.WHOOP_TOTEM_CREDENTIALS_PATH;
 }
 
-function resolveTotemRuntimeRoot(credentialsPath: string) {
-  const localRoot = dirname(credentialsPath);
-  if (existsSync(join(localRoot, "dist/whoop/client.js"))) {
-    return localRoot;
-  }
-
-  return dirname(require.resolve("@thebriangao/totem/package.json"));
-}
 
 async function fetchRecovery(totem: Awaited<ReturnType<typeof createTotemClient>>, date: string) {
   const [{ projectRecovery }, { RecoveryOut }] = await Promise.all([
