@@ -32,6 +32,36 @@ export async function syncRenpho(env: AppEnv, input?: { startDate?: string; endD
 
   const supabase = createSupabaseAdmin(env);
   const userId = await resolveUserId(env, supabase);
+
+  if (shouldUseMfpService(env)) {
+    const response = await fetch(`${getMfpServiceUrl(env)}/renpho/sync`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.INTERNAL_WORKER_SECRET}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        start_date: input?.startDate ?? null,
+        end_date: input?.endDate ?? null
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`RENPHO service sync failed with status ${response.status}: ${await response.text()}`);
+    }
+
+    const payload = renphoSyncSchema.parse(await response.json());
+    await upsertRenphoBodyMetrics(supabase, userId, payload.body_metrics);
+    await upsertRenphoConnection(supabase, userId, "connected");
+
+    return {
+      userId,
+      bodyMetrics: payload.body_metrics.length,
+      rangeStart: input?.startDate ?? null,
+      rangeEnd: input?.endDate ?? null
+    };
+  }
+
   const root = findWorkspaceRoot(process.cwd());
   const executable = join(root, "services/mfp/.venv/bin/fitness-renpho");
 
@@ -156,4 +186,12 @@ function findWorkspaceRoot(start: string) {
   }
 
   return start;
+}
+
+function shouldUseMfpService(env: AppEnv) {
+  return Boolean(env.MFP_SERVICE_URL || process.env.VERCEL);
+}
+
+function getMfpServiceUrl(env: AppEnv) {
+  return (env.MFP_SERVICE_URL ?? `${env.APP_BASE_URL.replace(/\/$/, "")}/api/mfp`).replace(/\/$/, "");
 }

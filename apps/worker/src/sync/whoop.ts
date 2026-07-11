@@ -1,9 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import type { AppEnv } from "@fitness/shared";
 import { createSupabaseAdmin, resolveUserId, type SupabaseAdmin } from "./supabase";
+
+const require = createRequire(import.meta.url);
 
 const recoverySchema = z.object({
   date: z.string(),
@@ -44,9 +48,9 @@ type WhoopRecovery = z.infer<typeof recoverySchema>;
 type WhoopSleep = z.infer<typeof sleepSchema>;
 
 export async function syncWhoop(env: AppEnv, input?: { startDate?: string; endDate?: string }) {
-  const credentialsPath = env.WHOOP_TOTEM_CREDENTIALS_PATH;
+  const credentialsPath = resolveCredentialsPath(env);
   if (!credentialsPath) {
-    throw new Error("WHOOP_TOTEM_CREDENTIALS_PATH is required");
+    throw new Error("WHOOP Totem credentials are required");
   }
   if (!existsSync(credentialsPath)) {
     throw new Error(`WHOOP Totem credentials file not found at ${credentialsPath}`);
@@ -112,7 +116,7 @@ function enumerateDates(startDate: string, endDate: string) {
 
 async function createTotemClient(credentialsPath: string) {
   loadEnvFile(credentialsPath);
-  const totemRoot = dirname(credentialsPath);
+  const totemRoot = resolveTotemRuntimeRoot(credentialsPath);
   const importFromTotem = async (path: string) => import(pathToFileURL(join(totemRoot, path)).href);
   const [{ WhoopClient }, { TokenManager }, { EnvFileTokenStore }] = await Promise.all([
     importFromTotem("dist/whoop/client.js"),
@@ -135,6 +139,30 @@ async function createTotemClient(credentialsPath: string) {
     client: new WhoopClient({ getToken: () => tokenManager.getToken() }),
     importFromTotem
   };
+}
+
+function resolveCredentialsPath(env: AppEnv) {
+  const credentialText = env.WHOOP_TOTEM_CREDENTIALS_BASE64
+    ? Buffer.from(env.WHOOP_TOTEM_CREDENTIALS_BASE64, "base64").toString("utf8")
+    : env.WHOOP_TOTEM_CREDENTIALS_TEXT;
+
+  if (credentialText) {
+    const dir = mkdtempSync(join(tmpdir(), "whoop-totem-"));
+    const path = join(dir, ".env");
+    writeFileSync(path, credentialText, { encoding: "utf8", mode: 0o600 });
+    return path;
+  }
+
+  return env.WHOOP_TOTEM_CREDENTIALS_PATH;
+}
+
+function resolveTotemRuntimeRoot(credentialsPath: string) {
+  const localRoot = dirname(credentialsPath);
+  if (existsSync(join(localRoot, "dist/whoop/client.js"))) {
+    return localRoot;
+  }
+
+  return dirname(require.resolve("@thebriangao/totem/package.json"));
 }
 
 async function fetchRecovery(totem: Awaited<ReturnType<typeof createTotemClient>>, date: string) {

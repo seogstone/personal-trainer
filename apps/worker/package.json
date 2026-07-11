@@ -22,6 +22,7 @@
     "@fitness/analytics": "workspace:*",
     "@fitness/shared": "workspace:*",
     "@supabase/supabase-js": "^2.50.5",
+    "@thebriangao/totem": "^1.4.4",
     "zod": "^3.25.76"
   },
   "devDependencies": {

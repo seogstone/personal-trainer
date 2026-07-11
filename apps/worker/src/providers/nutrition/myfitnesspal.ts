@@ -93,6 +93,26 @@ export class MyFitnessPalProvider implements NutritionProvider {
   async syncRange(input: SyncRange): Promise<MfpSyncRange> {
     this.assertConfigured();
 
+    if (shouldUseMfpService(this.env)) {
+      const response = await fetch(`${getMfpServiceUrl(this.env)}/sync-range`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.env.INTERNAL_WORKER_SECRET}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          start_date: input.startDate,
+          end_date: input.endDate
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`MFP service sync failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      return mfpSyncRangeSchema.parse(await response.json());
+    }
+
     const root = findWorkspaceRoot(process.cwd());
     const executable = join(root, "services/mfp/.venv/bin/fitness-mfp");
     if (!existsSync(executable)) {
@@ -113,15 +133,14 @@ export class MyFitnessPalProvider implements NutritionProvider {
   }
 
   async getConnectionStatus(): Promise<ProviderConnection> {
-    const cookieFile = this.env.MFP_COOKIE_FILE;
-    const configured = cookieFile ? hasUsableCookieFile(cookieFile) : false;
+    const configured = Boolean(this.env.MFP_COOKIE_TEXT || this.env.MFP_COOKIE_BASE64) || Boolean(this.env.MFP_COOKIE_FILE && hasUsableCookieFile(this.env.MFP_COOKIE_FILE));
 
     return {
       provider: "myfitnesspal",
       status: configured ? "connected" : "not_configured",
       lastSuccessfulSyncAt: null,
       lastAttemptedSyncAt: null,
-      reauthenticationRequired: Boolean(cookieFile && !configured),
+      reauthenticationRequired: Boolean((this.env.MFP_COOKIE_FILE || this.env.MFP_COOKIE_TEXT || this.env.MFP_COOKIE_BASE64) && !configured),
       safeMessage: configured
         ? "Cookie-based collection runs through the persistent Python collector."
         : "Configure MFP_COOKIE_FILE with an exported MyFitnessPal browser cookie jar."
@@ -129,10 +148,25 @@ export class MyFitnessPalProvider implements NutritionProvider {
   }
 
   private assertConfigured() {
+    if (shouldUseMfpService(this.env)) {
+      if (!this.env.MFP_COOKIE_TEXT && !this.env.MFP_COOKIE_BASE64 && !this.env.MFP_COOKIE_FILE) {
+        throw new Error("Configure MFP_COOKIE_TEXT or MFP_COOKIE_BASE64 for production MyFitnessPal sync");
+      }
+      return;
+    }
+
     if (!this.env.MFP_COOKIE_FILE || !hasUsableCookieFile(this.env.MFP_COOKIE_FILE)) {
       throw new Error("MFP_COOKIE_FILE is not configured");
     }
   }
+}
+
+function shouldUseMfpService(env: AppEnv) {
+  return Boolean(env.MFP_SERVICE_URL || process.env.VERCEL);
+}
+
+function getMfpServiceUrl(env: AppEnv) {
+  return (env.MFP_SERVICE_URL ?? `${env.APP_BASE_URL.replace(/\/$/, "")}/api/mfp`).replace(/\/$/, "");
 }
 
 function hasUsableCookieFile(path: string) {

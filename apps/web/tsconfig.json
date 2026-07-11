@@ -8,6 +8,7 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
+      "@fitness/shared": ["../../packages/shared/src/index.ts"],
       "@fitness/worker/sync": ["../worker/src/sync/index.ts"]
     }
   },
