@@ -17,6 +17,7 @@ import {
 import { calculateNutritionAdherence, calculateReadiness, recommendTraining } from "@fitness/analytics";
 import { demoConnections, demoNutrition, demoRecovery } from "@fitness/shared";
 import { TrendChart } from "@/components/trend-chart";
+import { ManualSyncButton } from "@/components/manual-sync-button";
 import { Shell } from "@/components/shell";
 import { getAiBriefing } from "@/lib/ai-briefing";
 import { getNutritionOverview } from "@/lib/nutrition-data";
@@ -82,9 +83,12 @@ export default async function DashboardPage() {
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted">{formatToday()}</p>
               <h1 className="mt-1 text-2xl font-semibold tracking-normal sm:text-3xl">Today&apos;s command center</h1>
             </div>
-            <div className="flex min-w-fit items-center gap-2 rounded-md border border-border bg-panel/80 px-2.5 py-2 text-xs text-muted">
-              <RefreshCcw className="h-4 w-4 text-accent" />
-              {connections.filter((connection) => connection.status === "connected").length}/3 live
+            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              <div className="flex min-w-fit items-center justify-center gap-2 rounded-md border border-border bg-panel/80 px-2.5 py-2 text-xs text-muted">
+                <RefreshCcw className="h-4 w-4 text-accent" />
+                {connections.filter((connection) => connection.status === "connected").length}/3 live
+              </div>
+              <ManualSyncButton />
             </div>
           </div>
         </section>
