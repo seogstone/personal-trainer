@@ -168,7 +168,7 @@ def get_measurements_if_available(
 ) -> dict[date, float]:
     try:
         return dict(client.get_measurements(measurement, start, end))
-    except ValueError:
+    except Exception:
         return {}
 
 
