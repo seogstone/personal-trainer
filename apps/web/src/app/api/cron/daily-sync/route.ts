@@ -65,13 +65,13 @@ export async function GET(request: Request) {
 }
 
 function authorizeCron(request: Request): { ok: true } | { ok: false; status: number; error: string } {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return { ok: false, status: 500, error: "CRON_SECRET is not configured" };
+  const allowedSecrets = [process.env.CRON_SECRET, process.env.INTERNAL_WORKER_SECRET].filter(Boolean);
+  if (!allowedSecrets.length) {
+    return { ok: false, status: 500, error: "No cron authorization secret is configured" };
   }
 
   const authorization = request.headers.get("authorization");
-  if (authorization !== `Bearer ${secret}`) {
+  if (!allowedSecrets.some((secret) => authorization === `Bearer ${secret}`)) {
     return { ok: false, status: 401, error: "Unauthorized" };
   }
 
