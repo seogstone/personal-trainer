@@ -51,6 +51,41 @@ describe("calculateNutritionAdherence", () => {
     expect(result.incompleteDiaryWarning).toBe(true);
     expect(result.loggedDayCompleteness).toBe(0);
   });
+
+  it("does not count an in-progress current day as a failed completed log", () => {
+    const result = calculateNutritionAdherence(
+      [
+        {
+          userId: "u",
+          source: "myfitnesspal",
+          calendarDate: "2026-07-22",
+          caloriesConsumed: 2300,
+          proteinG: 180,
+          carbohydrateG: 220,
+          fatG: 80,
+          goalCalories: 2400,
+          goalProteinG: 180,
+          complete: true
+        },
+        {
+          userId: "u",
+          source: "myfitnesspal",
+          calendarDate: "2026-07-23",
+          caloriesConsumed: 450,
+          proteinG: 30,
+          carbohydrateG: 50,
+          fatG: 12,
+          goalCalories: 2400,
+          goalProteinG: 180,
+          complete: false
+        }
+      ],
+      { currentDate: "2026-07-23" }
+    );
+
+    expect(result.incompleteDiaryWarning).toBe(false);
+    expect(result.loggedDayCompleteness).toBe(1);
+  });
 });
 
 describe("estimateOneRepMaxEpley", () => {

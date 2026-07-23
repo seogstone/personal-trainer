@@ -20,12 +20,12 @@ export function recommendTraining(input: TrainingRecommendationInput): string {
   const needsWorkout = input.workoutsCompletedThisWeek < input.weeklyWorkoutTarget;
 
   if (input.readinessScore >= 70 && needsWorkout && !input.sleptUnderSixHours) {
-    return `Recovery looks good. Complete ${routine} today, keep the session around RPE 7, and check shoulder, knee and ankle comfort before progressing.`;
+    return `Recovery looks good. Complete ${routine} today and keep the session around RPE 7, with clean reps and no forced progression.`;
   }
 
   if (input.readinessScore >= 50) {
-    return `Train if pain-free, but trim volume or intensity by about 10-20%. ${needsWorkout ? `Use ${routine} as the base.` : "You are on track for the week."}`;
+    return `Train controlled and trim optional volume by about 10-20%. ${needsWorkout ? `Use ${routine} as the base.` : "You are on track for the week."}`;
   }
 
-  return "Prioritize recovery, walking or mobility today. Avoid pushing through pain and resume heavier training when readiness improves.";
+  return "Prioritize recovery, walking or mobility today. Resume heavier training when readiness improves.";
 }

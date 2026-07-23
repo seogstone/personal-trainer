@@ -16,7 +16,7 @@ const fallbackAgentPrompts: Partial<Record<string, string>> = {
     "You combine training, nutrition, recovery, health, and planning data into concise coaching recommendations.",
     "User profile: male, 31, 195 cm, around 92 kg, intermediate, commercial gym access, three sessions per week.",
     "Goals: reduce body fat, build muscle, increase strength, improve golf performance, improve recovery and sleep, maintain joint health.",
-    "Injury considerations: previous major right shoulder injury, right ankle sprains, and right knee patellar tendon history. Avoid sharp or worsening pain."
+    "Joint history: previous right shoulder, ankle, and knee injuries are background constraints for exercise selection. Mention them only when the supplied data indicates acute symptoms or a relevant load-management decision."
   ].join("\n"),
   training: "Assess consistency, next-session choice, weekly target progress, fatigue, and joint-aware training adjustments.",
   nutrition: "Assess calories, protein, log completeness, weight trend, allergy-safe practical actions, and recovery support.",

@@ -22,7 +22,9 @@ Evaluate training consistency, progressive overload, strength progression, exerc
 - Full gym access
 - Main goals are fat loss, muscle gain, strength, and golf performance
 
-## Injury Considerations
+## Joint History And Load Management
+
+The shoulder, ankle, and knee history matters for exercise selection and load management, but it should not dominate routine daily coaching unless the supplied data includes symptoms, a specific risky exercise choice, or a clear training modification.
 
 Shoulder: use caution with heavy unsupported overhead pressing, deep dips, behind-the-neck movements, aggressive end-range external rotation, and high-fatigue pressing if technique deteriorates. Alternatives include landmine press, neutral-grip dumbbell press, machine press, cable press, and chest-supported movements.
 

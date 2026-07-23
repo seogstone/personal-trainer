@@ -20,6 +20,7 @@ import { TrendChart } from "@/components/trend-chart";
 import { ManualSyncButton } from "@/components/manual-sync-button";
 import { Shell } from "@/components/shell";
 import { getAiBriefing } from "@/lib/ai-briefing";
+import { getDayContext } from "@/lib/day-context";
 import { getNutritionOverview } from "@/lib/nutrition-data";
 import { getRecoveryOverview } from "@/lib/recovery-data";
 import { getTrainingOverview } from "@/lib/training-data";
@@ -30,13 +31,14 @@ const WEEKLY_WORKOUT_TARGET = 3;
 
 export default async function DashboardPage() {
   const [training, nutritionOverview, recoveryOverview] = await Promise.all([getTrainingOverview(), getNutritionOverview(), getRecoveryOverview()]);
+  const dayContext = getDayContext();
   const recoveryDays = recoveryOverview.recoveries.length ? recoveryOverview.recoveries : demoRecovery;
   const nutritionDays = nutritionOverview.days.length ? nutritionOverview.days : demoNutrition;
   const todayRecovery = recoveryDays.at(-1);
   const previousRecovery = recoveryDays.at(-2);
   const todaySleep = recoveryOverview.sleeps.at(-1);
   const todayNutrition = nutritionDays.at(-1);
-  const nutrition = calculateNutritionAdherence(nutritionDays);
+  const nutrition = calculateNutritionAdherence(nutritionDays, { allowPartialHistoricalLogs: true, currentDate: dayContext.date });
   const sleepDebtMinutes = todaySleep?.totalSleepMinutes != null && todaySleep.sleepNeedMinutes != null ? todaySleep.sleepNeedMinutes - todaySleep.totalSleepMinutes : null;
   const readiness = calculateReadiness({
     whoopRecoveryScore: todayRecovery?.recoveryScore ?? null,
@@ -71,6 +73,8 @@ export default async function DashboardPage() {
   const proteinTarget = todayNutrition?.goalProteinG ?? 180;
   const proteinValue = todayNutrition?.proteinG ?? 0;
   const proteinPercent = proteinTarget ? Math.round((proteinValue / proteinTarget) * 100) : null;
+  const isTodayNutrition = todayNutrition?.calendarDate === dayContext.date;
+  const currentFoodLogOpen = isTodayNutrition && dayContext.nutritionLogExpectation !== "should_be_nearly_complete" && !todayNutrition?.complete;
   const calorieAverage = nutrition.sevenDayAverageCalories ? Math.round(nutrition.sevenDayAverageCalories) : null;
   const loggedCompleteness = Math.round(nutrition.loggedDayCompleteness * 100);
 
@@ -135,20 +139,27 @@ export default async function DashboardPage() {
         ) : null}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard icon={Utensils} label="Protein today" value={`${Math.round(proteinValue)}g`} subvalue={proteinPercent == null ? "No target" : `${proteinPercent}% of ${Math.round(proteinTarget)}g`} progress={proteinPercent} tone="cyan" />
+          <KpiCard
+            icon={Utensils}
+            label={currentFoodLogOpen ? "Protein so far" : "Protein today"}
+            value={`${Math.round(proteinValue)}g`}
+            subvalue={proteinPercent == null ? "No target" : `${proteinPercent}% of ${Math.round(proteinTarget)}g${currentFoodLogOpen ? " planned" : ""}`}
+            progress={proteinPercent}
+            tone="cyan"
+          />
           <KpiCard icon={Scale} label="Body comp" value={nutritionOverview.latestWeightKg ? `${nutritionOverview.latestWeightKg}kg` : "N/A"} subvalue={nutritionOverview.latestBodyFatPercent ? `${nutritionOverview.latestBodyFatPercent}% body fat` : "RENPHO trend"} tone="coral" />
           <KpiCard icon={CalendarCheck} label="Training week" value={`${training.workoutsThisWeek}/${WEEKLY_WORKOUT_TARGET}`} subvalue={`${training.routines.length} routines ready`} progress={(training.workoutsThisWeek / WEEKLY_WORKOUT_TARGET) * 100} tone="amber" />
-          <KpiCard icon={Clock3} label="Food log" value={`${loggedCompleteness}%`} subvalue={calorieAverage ? `${calorieAverage} kcal avg` : `${nutritionOverview.mealCount} meals logged`} progress={loggedCompleteness} tone="violet" />
+          <KpiCard icon={Clock3} label="Tracked days" value={`${loggedCompleteness}%`} subvalue={calorieAverage ? `${calorieAverage} kcal avg tracked days` : `${nutritionOverview.mealCount} meals logged`} progress={loggedCompleteness} tone="violet" />
         </section>
 
         <section className="grid gap-3 lg:grid-cols-3">
           <FocusPanel
             icon={ShieldCheck}
-            title="Joint-aware training"
-            eyebrow="Shoulder · knee · ankle"
+            title="Training focus"
+            eyebrow="Strength · muscle · golf"
             lines={[
-              "Warm up longer than you think you need.",
-              "Keep main lifts controlled and stop sharp pain early.",
+              "Use the plan as the anchor and progress only when reps stay clean.",
+              "Keep warm-ups deliberate; save joint-specific changes for actual symptoms or risky movements.",
               training.workoutsThisWeek < WEEKLY_WORKOUT_TARGET ? "Protect the habit: complete the next routine before adding extras." : "Weekly target is covered; optional work should stay easy."
             ]}
           />
@@ -157,8 +168,8 @@ export default async function DashboardPage() {
             title="Nutrition target"
             eyebrow="Fat loss with muscle retention"
             lines={[
-              nutrition.incompleteDiaryWarning ? "Food log is incomplete, so calorie conclusions are provisional." : "Food log has enough completed days for a useful signal.",
-              `Protein target: ${Math.round(proteinTarget)}g. Current logged: ${Math.round(proteinValue)}g.`,
+              currentFoodLogOpen ? "Today's log is still in progress; judge adherence from previous tracked days and plan the remaining meals." : nutrition.incompleteDiaryWarning ? "Some previous days have no nutrition logged, so trend conclusions are provisional." : "Food log has enough tracked days for a useful signal.",
+              `${currentFoodLogOpen ? "Protein so far" : "Protein logged"}: ${Math.round(proteinValue)}g of ${Math.round(proteinTarget)}g.`,
               nutritionOverview.latestWeightKg ? `Latest RENPHO weight: ${nutritionOverview.latestWeightKg}kg.` : "No recent body-weight record available."
             ]}
           />

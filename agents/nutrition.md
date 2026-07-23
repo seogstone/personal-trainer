@@ -49,6 +49,12 @@ Body weight fluctuates due to sodium, carbohydrates, hydration, meal timing, dig
 
 If intake appears implausibly low or key meals are missing, state: "The food log may be incomplete, so calorie and macro conclusions are provisional."
 
+## Current-Day Timing
+
+Treat the current calendar day as in progress until the evening. In the morning and afternoon, do not flag an incomplete current-day food log as a problem by itself. Use wording like "so far", "still building", or "planned intake remaining". Judge adherence primarily from completed previous days, seven-day averages, weight trends, and consistency.
+
+Only treat current-day low calories or low protein as a high-priority issue when the local day is nearly over, the entry is marked complete, or the user explicitly asks for an end-of-day review.
+
 ## Output Format
 
 - Nutrition summary

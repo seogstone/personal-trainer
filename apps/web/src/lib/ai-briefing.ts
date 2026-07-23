@@ -2,6 +2,7 @@ import type { NutritionOverview } from "./nutrition-data";
 import type { RecoveryOverview } from "./recovery-data";
 import type { TrainingOverview } from "./training-data";
 import { loadCoachAgentPrompt } from "./coach-agent-loader";
+import { getDayContext } from "./day-context";
 
 export type AiBriefing = {
   status: "ready" | "fallback" | "not_configured" | "unavailable";
@@ -48,7 +49,7 @@ export async function getAiBriefing(input: BriefingInput): Promise<AiBriefing> {
         input: [
           {
             role: "system",
-            content: `${agentPrompt}\n\nTask: Create a concise daily dashboard briefing. Be cautious and evidence-based. Use ASCII plain English only. Do not diagnose, do not claim causation, and do not invent data. Flag only practical items that deserve attention today.`
+            content: `${agentPrompt}\n\nTask: Create a concise daily dashboard briefing. Be cautious and evidence-based. Use ASCII plain English only. Do not diagnose, do not claim causation, and do not invent data. Flag only practical items that deserve attention today.\n\nTiming rules: today is an in-progress day until evening. Do not criticise an incomplete current-day food log in the morning or afternoon; frame it as \"so far\" or \"still building\" and use completed previous days or seven-day trends for adherence. Only flag current-day calories or protein as high severity when the local day is nearly over or the data clearly indicates an unusual completed entry.\n\nInjury context rules: the shoulder, knee, and ankle history is background for exercise selection and load management. Do not make it a headline or attention item unless an acute pain, swelling, instability, sudden performance loss, or relevant exercise-risk signal is supplied.`
           },
           {
             role: "user",
@@ -183,9 +184,15 @@ function buildBriefingFacts({ training, nutrition, recovery }: BriefingInput) {
   const latestRecovery = recovery.recoveries.at(-1);
   const latestSleep = recovery.sleeps.at(-1);
   const latestNutrition = nutrition.days.at(-1);
+  const dayContext = getDayContext();
+  const completedNutritionDays = nutrition.days.filter((day) => day.complete && day.calendarDate !== dayContext.date);
+  const trackedNutritionDays = nutrition.days.filter((day) => day.calendarDate !== dayContext.date && hasLoggedNutrition(day));
+  const nutritionTrendDays = completedNutritionDays.length ? completedNutritionDays : trackedNutritionDays;
+  const recentNutritionTrendDays = nutritionTrendDays.slice(-7);
 
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: dayContext.date,
+    dayContext,
     dataAvailability: {
       recoveryDays: recovery.recoveries.length,
       sleepSessions: recovery.sleeps.length,
@@ -214,11 +221,17 @@ function buildBriefingFacts({ training, nutrition, recovery }: BriefingInput) {
     nutrition: latestNutrition
       ? {
           date: latestNutrition.calendarDate,
+          isCurrentDay: latestNutrition.calendarDate === dayContext.date,
+          currentDayLogExpectation: latestNutrition.calendarDate === dayContext.date ? dayContext.nutritionLogExpectation : "completed_historical_day",
           caloriesConsumed: latestNutrition.caloriesConsumed,
           proteinG: latestNutrition.proteinG,
           goalCalories: latestNutrition.goalCalories,
           goalProteinG: latestNutrition.goalProteinG,
           complete: latestNutrition.complete,
+          sevenDayTrackedAverageCalories: average(recentNutritionTrendDays.map((day) => day.caloriesConsumed).filter(isNumber)),
+          sevenDayTrackedAverageProteinG: average(recentNutritionTrendDays.map((day) => day.proteinG).filter(isNumber)),
+          completedDaysInLookback: completedNutritionDays.length,
+          trackedDaysInLookback: trackedNutritionDays.length,
           latestWeightKg: nutrition.latestWeightKg
         }
       : {
@@ -235,6 +248,10 @@ function buildBriefingFacts({ training, nutrition, recovery }: BriefingInput) {
 function buildRuleBasedBriefing(input: BriefingInput, reason: string): AiBriefing {
   const facts = buildBriefingFacts(input);
   const items: AiBriefing["attentionItems"] = [];
+  const currentNutritionDay =
+    facts.nutrition && "isCurrentDay" in facts.nutrition && facts.nutrition.isCurrentDay ? facts.nutrition : null;
+  const currentDayStillOpen =
+    currentNutritionDay?.currentDayLogExpectation === "too_early" || currentNutritionDay?.currentDayLogExpectation === "in_progress";
 
   if (!facts.recovery || !facts.sleep) {
     items.push({
@@ -260,7 +277,7 @@ function buildRuleBasedBriefing(input: BriefingInput, reason: string): AiBriefin
     });
   }
 
-  if (facts.nutrition && "proteinG" in facts.nutrition && facts.nutrition.goalProteinG && facts.nutrition.proteinG != null) {
+  if (facts.nutrition && "proteinG" in facts.nutrition && facts.nutrition.goalProteinG && facts.nutrition.proteinG != null && !currentDayStillOpen) {
     const proteinPercent = facts.nutrition.goalProteinG ? facts.nutrition.proteinG / facts.nutrition.goalProteinG : null;
     if (proteinPercent != null && proteinPercent < 0.75) {
       items.push({
@@ -282,7 +299,7 @@ function buildRuleBasedBriefing(input: BriefingInput, reason: string): AiBriefin
   return {
     status: "fallback",
     headline: "Local coaching summary ready",
-    summary: `${reason} Data loaded: ${facts.dataAvailability.recoveryDays} recovery days, ${facts.dataAvailability.sleepSessions} sleep sessions, ${facts.dataAvailability.nutritionDays} nutrition days, and ${facts.dataAvailability.hevyRoutines} routines. Treat missing same-day recovery or incomplete food logging as provisional before making training decisions.`,
+    summary: `${reason} Data loaded: ${facts.dataAvailability.recoveryDays} recovery days, ${facts.dataAvailability.sleepSessions} sleep sessions, ${facts.dataAvailability.nutritionDays} nutrition days, and ${facts.dataAvailability.hevyRoutines} routines. Today's food log is treated as ${facts.dayContext.nutritionLogExpectation.replaceAll("_", " ")}, so nutrition judgement should lean on completed days and trends.`,
     attentionItems: items.slice(0, 4)
   };
 }
@@ -295,4 +312,14 @@ function formatHours(minutes: number) {
   const hours = Math.floor(Math.abs(minutes) / 60);
   const mins = Math.abs(minutes) % 60;
   return hours ? `${hours}h ${mins}m` : `${mins}m`;
+}
+
+const average = (values: number[]) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null);
+
+function isNumber(value: number | null): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasLoggedNutrition(day: { caloriesConsumed?: number | null; proteinG?: number | null }) {
+  return Boolean((day.caloriesConsumed != null && day.caloriesConsumed > 0) || (day.proteinG != null && day.proteinG > 0));
 }
